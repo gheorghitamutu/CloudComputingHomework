@@ -7,6 +7,7 @@ import socket
 import time
 import uuid
 import re
+import logging
 
 
 class LogLevel(enum.Enum):
@@ -17,8 +18,10 @@ class LogLevel(enum.Enum):
     ERROR = 'ERROR'
 
 
-class LogAPI:
-    def __init__(self):
+class LogAPI(logging.Handler):
+    def __init__(self, logger=None):
+        super().__init__()
+
         # config
         module_path = os.path.dirname(__file__)
         config_abs_path = os.path.join(module_path, 'config')
@@ -31,14 +34,16 @@ class LogAPI:
 
         self.logdna_api = 'https://logs.logdna.com/logs/ingest'
 
-    def make_request(self, line, level):
+        self.logger = logger
+
+    def emit(self, record):
         data = \
             {
                 'lines':
                     [
                         {
-                            'line': str(line),
-                            'level': level,
+                            'line': str(record),
+                            'level': self.level,
                             'env': "development",
                             'app': 'Homework01'
                         }

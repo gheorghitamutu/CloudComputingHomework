@@ -3,6 +3,7 @@
 # https://app.scrapinghub.com
 # https://logdna.com | https://github.com/logdna/python
 # https://httpstatuses.com | status codes explained
+# https://github.com/pallets/flask/issues/2998 | logging behaviour explained
 
 from flask import Flask, request
 import json
@@ -10,14 +11,37 @@ import os
 import requests
 from urllib.parse import urljoin
 from .logdna import LogAPI, LogLevel
+import logging
+from flask.logging import default_handler
+from .aws_storage import AWS3Storage
 
 
 class App(Flask):
+    app_logger = None
+
     def __init__(self, import_name):
         super().__init__(import_name)
+        self.logger.removeHandler(default_handler)
+        logging.getLogger().setLevel(logging.DEBUG)
+
+        App.app_logger = self.logger
+
+        formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        fileHandler = logging.FileHandler("{}.log".format(self.__class__.__name__))
+        fileHandler.setFormatter(formatter)
+        self.logger.addHandler(fileHandler)
+        fileHandler.close()
+
+        # logging - DNA
+        self.logdna = LogAPI(self.logger)
+        self.logger.addHandler(self.logdna)
 
         #  bind routes callbacks
         self.add_url_rule('/', view_func=self.root_handler, methods=['GET', 'POST'])
+
+        # bind decorators
+        self.before_request(self.log_before_request)
+        self.after_request(self.log_after_request)
 
         # config
         module_path = os.path.dirname(__file__)
@@ -32,8 +56,9 @@ class App(Flask):
 
         self.VT_API_v3 = 'https://www.virustotal.com/vtapi/v2/'
 
-        # logging - DNA
-        self.logdna = LogAPI()
+        # AWS3 Storage
+        self.storage = AWS3Storage(self.logger)
+        self.storage.upload_to_aws(r'D:\01\test', 'test')
 
     def vt_file(self, file_option, scan_option, params):
         file_url = urljoin(self.VT_API_v3, 'file/')
@@ -70,6 +95,7 @@ class App(Flask):
             raise 'Invalid params!'
 
         det_percentage = 0
+        json_reponse = None
 
         response = requests.get(option_url, params=params)
 
@@ -79,32 +105,29 @@ class App(Flask):
             if json_reponse['response_code'] == 1:  # hash found on VT
                 det_percentage = json_reponse['positives'] / json_reponse['total'] * 100
 
-                logdna_response = self.logdna.make_request(
+                self.logger.info(
                     dict({
                         'md5': json_reponse['md5'],  # replace this with the actual computed md5
                         'det_percentage': '{0:.2f}%'.format(det_percentage),
                         'VT_call_succeeded': True,
                         'VT_found': True
-                    }),
-                    LogLevel.DEBUG.value)
+                    }))
             else:
-                logdna_response = self.logdna.make_request(
+                self.logger.warning(
                     dict({
                         'md5': 'placeholder',  # replace this with the actual computed md5
                         'det_percentage': '0%',
                         'VT_call_succeeded': True,
                         'VT_found': False
-                    }),
-                    LogLevel.WARNING.value)
+                    }))
         else:
-            logdna_response = self.logdna.make_request(
+            self.logger.error(
                 dict({
                     'md5': 'placeholder',  # replace this with the actual computed md5
                     'det_percentage': '0%',
                     'VT_call_succeeded': False,
                     'VT_found': False
-                }),
-                LogLevel.ERROR.value)
+                }))
 
         return json_reponse
 
@@ -118,3 +141,13 @@ class App(Flask):
         params = {'apikey': self.api_config['VT_API_Key'], 'resource': a}
         b = self.vt_file('report', '', params)
         return b
+
+    @staticmethod
+    def log_before_request():
+        App.app_logger.debug('Headers: %s', request.headers)
+        App.app_logger.debug('Body: %s', request.get_data())
+
+    @staticmethod
+    def log_after_request(response):
+        App.app_logger.debug('Response: %s', response)
+        return response
