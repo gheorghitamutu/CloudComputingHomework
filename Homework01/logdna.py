@@ -1,6 +1,5 @@
 import os
 import json
-import enum
 import requests
 import sys
 import socket
@@ -10,17 +9,12 @@ import re
 import logging
 
 
-class LogLevel(enum.Enum):
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
-    WARN = 'WARN'
-    WARNING = 'WARNING'
-    ERROR = 'ERROR'
-
-
 class LogAPI(logging.Handler):
     def __init__(self, logger=None):
         super().__init__()
+
+        self.logger = logger
+        self.logger.addHandler(self)
 
         # config
         module_path = os.path.dirname(__file__)
@@ -31,10 +25,7 @@ class LogAPI(logging.Handler):
             self.api_config = json.load(fp_config)
 
         self.api_key = self.api_config['logdna_API_Key']
-
-        self.logdna_api = 'https://logs.logdna.com/logs/ingest'
-
-        self.logger = logger
+        self.api = 'https://logs.logdna.com/logs/ingest'
 
     def emit(self, record):
         data = \
@@ -43,7 +34,7 @@ class LogAPI(logging.Handler):
                     [
                         {
                             'line': str(record),
-                            'level': self.level,
+                            'level': logging._levelToName[record.levelno],  # explicit level name for logDNA
                             'env': "development",
                             'app': 'Homework01'
                         }
@@ -51,7 +42,7 @@ class LogAPI(logging.Handler):
             }
 
         response = requests.post(
-            url=self.logdna_api,
+            url=self.api,
             json=data,
             auth=('user', self.api_key),
             params={
@@ -66,4 +57,4 @@ class LogAPI(logging.Handler):
             headers={'user-agent': '{}'.format(sys.version)}
         )
 
-        return response
+        return response  # TODO: can you really check this?
