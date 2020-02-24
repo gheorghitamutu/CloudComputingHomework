@@ -39,18 +39,25 @@ class App(Flask):
         self.logger.addHandler(fileHandler)
         fileHandler.close()
 
+        # metrics
+        self.metrics = {
+            'VT': 0,
+            'logDNA': 0,
+            'AWS': 0,
+            'shortener': 0,
+            'mail': 0
+        }
+
         # logging - DNA
-        self.log_api = LogAPI(self.logger)
+        self.log_api = LogAPI(self.logger, self.metrics)
 
         #  bind routes callbacks
         self.add_url_rule('/', view_func=self.index, methods=['GET', 'POST'])
+        self.add_url_rule('/shutdown', view_func=self.shutdown, methods=['GET', 'POST'])
 
         # bind request events decorators
         self.before_request(self.log_before_request)
         self.after_request(self.log_after_request)
-
-        # constant str members
-        self.hello_message = 'Hello World!'
 
         # Virus Total hash report
         self.vt_report = VTReport(self.logger)
@@ -89,21 +96,25 @@ class App(Flask):
                 md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
 
                 try:
+                    self.metrics['VT'] += 1
                     vt_report = self.vt_report.hash_report(md5)
 
                     if vt_report['VT_call_succeeded'] is False:
-                        data['message'] = 'Unable to find any info on VT!'
+                        data['message'] = 'Failed querying VT!'
                     else:
                         data['supported'] = True
 
                         if vt_report['VT_found'] is True:
                             min_det_ratio = 10
                             if vt_report['detpecentageint'] < min_det_ratio:
+                                self.metrics['AWS'] += 1
                                 upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
                                 if upload_url is not None:
 
+                                    self.metrics['shortener'] += 1
                                     upload_url_shortened = self.url_shortener.shorten_url(upload_url)
                                     if upload_url_shortened is not None:
+                                        self.metrics['mail'] += 1
                                         if self.mail_sender.send_email('Download link: {}'.format(
                                                 upload_url_shortened)) is True:
 
@@ -146,3 +157,15 @@ class App(Flask):
     @staticmethod
     def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ['txt', 'json', 'pdf', 'zip', 'xml']
+
+    def shutdown_server(self):
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+
+    def shutdown(self):
+        self.logger.info(str(self.metrics))
+        self.log_api.threadpool.wait_completion()
+        self.shutdown_server()
+        return 'Server shutting down...<br>{}'.format(str(self.metrics))

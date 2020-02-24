@@ -7,14 +7,17 @@ import time
 import uuid
 import re
 import logging
+from .threadpool import ThreadPool
 
 
 class LogAPI(logging.Handler):
-    def __init__(self, logger=None):
+    def __init__(self, logger, metrics):
         super().__init__()
 
         self.logger = logger
         self.logger.addHandler(self)
+
+        self.metrics = metrics
 
         # config
         module_path = os.path.dirname(__file__)
@@ -27,7 +30,13 @@ class LogAPI(logging.Handler):
         self.api_key = self.api_config['logdna_API_Key']
         self.api = 'https://logs.logdna.com/logs/ingest'
 
+        self.threadpool = ThreadPool(4)
+
     def emit(self, record):
+        self.metrics['logDNA'] += 1
+        self.threadpool.add_task(self.helper_thread, record)
+
+    def helper_thread(self, record):
         data = \
             {
                 'lines':
@@ -58,3 +67,6 @@ class LogAPI(logging.Handler):
         )
 
         return response  # TODO: can you really check this?
+
+    def __del__(self):  # don't bail out before writing/calling API logs
+        self.threadpool.wait_completion()
