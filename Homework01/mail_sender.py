@@ -37,8 +37,12 @@ class GmailSender:
         try:
             self.server.sendmail(self.sender, [self.to], email_body)
             self.logger.info('Email sent.')
+
+            return True
         except Exception as e:
             self.logger.error('Error sending mail: [{}]'.format(e))
+
+            return False
 
     def __del__(self):
         self.server.quit()

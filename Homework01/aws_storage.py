@@ -27,24 +27,24 @@ class AWS3Storage:
             aws_secret_access_key=self.SECRET_KEY).Bucket(self.bucket_name)
         self.bucket_location = self.s3.get_bucket_location(Bucket=self.bucket_name)['LocationConstraint']
 
-    def upload_to_aws(self, local_file, key):
-        # s3.upload_fileobj() TODO: use this for buffer upload
-
+    def upload_to_aws(self, file_obj, key):
         try:
-            self.s3.upload_file(local_file, self.bucket_name, key)
-            self.logger.info("Upload Successful")
+            self.s3.upload_fileobj(file_obj, self.bucket_name, key)
+            self.logger.info("Upload Successful!")
 
             file_object = [fo for fo in self.bucket.objects.all() if fo.key == key][0]
 
-            reponse_ignored = file_object.Acl().put(ACL='public-read')  # TODO: parse this!
+            acl_response = file_object.Acl().put(ACL='public-read')
+            if acl_response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                return None
 
-            url = "https://s3-{}.amazonaws.com/{}/{}".format(self.bucket_location, self.bucket_name, key)
-            self.logger.info("Download URL [{}]".format(url))
+            upload_url = "https://s3-{}.amazonaws.com/{}/{}".format(self.bucket_location, self.bucket_name, key)
+            self.logger.info("Download URL [{}]".format(upload_url))
 
-            return True
+            return upload_url
         except FileNotFoundError:
             self.logger.error("The file was not found")
-            return False
+            return None
         except NoCredentialsError:
             self.logger.error("Credentials not available")
-            return False
+            return None

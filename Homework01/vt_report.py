@@ -62,4 +62,8 @@ class VTReport:
 
         self.logger.log(log_level, str(logger_info))
 
-        return json_response
+        logger_info['detpecentageint'] = 0
+        if logger_info['VT_found'] is True:
+            logger_info['detpecentageint'] = json_response['positives'] / json_response['total'] * 100
+
+        return logger_info

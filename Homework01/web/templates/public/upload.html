@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% block title %}
+{{ super() }}
+{% endblock %}
+{% block head %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+
+<div class="row row-cols-1 row-cols-md-1">
+    <div class="col mb-4">
+
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">File Storage</h5>
+                <p class="card-text">Upload your file</p>
+            </div>
+        </div>
+
+        <br>
+
+        <div class="card">
+            <div class="card-body">
+
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="inputGroupFileAddon01">Upload</span>
+                    </div>
+                    <div class="custom-file">
+                        <input aria-describedby="inputGroupFileAddon01" class="custom-file-input"
+                               data="{{ url_for('index') }}" id="inputGroupFile01" type="file">
+                        <label class="custom-file-label" for="inputGroupFile01" id="file-picked">Choose file</label>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <br>
+
+        <div class="card">
+            <div class="card-body" id="uploaded_file_details">
+                Information about the uploaded files will be shown here.
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+{% endblock %}
