@@ -1,4 +1,5 @@
 import requests
+import time
 from Homework01.threadpool import ThreadPool
 
 
@@ -52,10 +53,16 @@ if __name__ == '__main__':
 
     tester = Tester()
     pool = ThreadPool(12)
+
+    start = time.time()
+
     for _ in range(num_tries):
         pool.add_task(tester.make_request_not_found)
         pool.add_task(tester.make_request_found)
         pool.add_task(tester.make_request_infected)
     pool.wait_completion()
 
+    end = time.time()
+
     print(tester.request_server_shutdown())
+    print('Delta: {}'.format(end - start))

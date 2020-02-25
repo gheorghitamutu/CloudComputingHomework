@@ -6,6 +6,7 @@
 # https://github.com/pallets/flask/issues/2998 | logging behaviour explained
 
 import logging
+import time
 import os
 import hashlib
 from flask import Flask, request, render_template, jsonify
@@ -42,10 +43,15 @@ class App(Flask):
         # metrics
         self.metrics = {
             'VT': 0,
+            'VT_total_time': 0,
             'logDNA': 0,
+            'logDNA_total_time': 0,
             'AWS': 0,
+            'AWS_total_time': 0,
             'shortener': 0,
-            'mail': 0
+            'shortener_total_time': 0,
+            'mail': 0,
+            'mail_total_time': 0
         }
 
         # logging - DNA
@@ -54,6 +60,7 @@ class App(Flask):
         #  bind routes callbacks
         self.add_url_rule('/', view_func=self.index, methods=['GET', 'POST'])
         self.add_url_rule('/shutdown', view_func=self.shutdown, methods=['GET', 'POST'])
+        self.add_url_rule('/metrics', view_func=self.metrics_route, methods=['GET'])
 
         # bind request events decorators
         self.before_request(self.log_before_request)
@@ -97,7 +104,9 @@ class App(Flask):
 
                 try:
                     self.metrics['VT'] += 1
+                    start = time.time()
                     vt_report = self.vt_report.hash_report(md5)
+                    self.metrics['VT_total_time'] += (time.time() - start)
 
                     if vt_report['VT_call_succeeded'] is False:
                         data['message'] = 'Failed querying VT!'
@@ -108,13 +117,18 @@ class App(Flask):
                             min_det_ratio = 10
                             if vt_report['detpecentageint'] < min_det_ratio:
                                 self.metrics['AWS'] += 1
+                                start = time.time()
                                 upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
+                                self.metrics['AWS_total_time'] += (time.time() - start)
                                 if upload_url is not None:
-
                                     self.metrics['shortener'] += 1
+                                    start = time.time()
                                     upload_url_shortened = self.url_shortener.shorten_url(upload_url)
+                                    self.metrics['shortener_total_time'] += (time.time() - start)
                                     if upload_url_shortened is not None:
                                         self.metrics['mail'] += 1
+                                        start = time.time()
+
                                         if self.mail_sender.send_email('Download link: {}'.format(
                                                 upload_url_shortened)) is True:
 
@@ -122,6 +136,8 @@ class App(Flask):
                                             data['message'] = 'Download link sent on email'
                                         else:
                                             data['message'] = 'Failed shortening the upload URL!'
+
+                                        self.metrics['mail_total_time'] += (time.time() - start)
                                     else:
                                         pass
                                 else:
@@ -169,3 +185,6 @@ class App(Flask):
         self.log_api.threadpool.wait_completion()
         self.shutdown_server()
         return 'Server shutting down...<br>{}'.format(str(self.metrics))
+
+    def metrics_route(self):
+        return self.metrics

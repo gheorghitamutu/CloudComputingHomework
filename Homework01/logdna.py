@@ -37,6 +37,7 @@ class LogAPI(logging.Handler):
         self.threadpool.add_task(self.helper_thread, record)
 
     def helper_thread(self, record):
+        start = time.time()
         data = \
             {
                 'lines':
@@ -65,6 +66,8 @@ class LogAPI(logging.Handler):
             timeout=5,
             headers={'user-agent': '{}'.format(sys.version)}
         )
+
+        self.metrics['logDNA_total_time'] += (time.time() - start)
 
         return response  # TODO: can you really check this?
 
