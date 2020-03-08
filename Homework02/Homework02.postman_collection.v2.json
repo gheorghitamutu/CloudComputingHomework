@@ -1,0 +1,193 @@
+{
+  "variables": [],
+  "info": {
+    "name": "Homework02",
+    "_postman_id": "c5f23d3c-c7f8-b304-b4aa-2b73e0730e2d",
+    "description": "",
+    "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "task",
+      "request": {
+        "url": "",
+        "method": "GET",
+        "header": [],
+        "body": {},
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "tasks",
+      "request": {
+        "url": "",
+        "method": "GET",
+        "header": [],
+        "body": {},
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "task",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks",
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"title\": \"Android - Homework 02\",\r\n    \"description\": \"Develop a landscape view for your OnlineShop application.\",\r\n    \"references\": \"https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-3\",\r\n    \"done\": false\r\n}"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "tasks",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks",
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\r\n\t{\r\n    \"title\": \"Android - Homework 02\",\r\n    \"description\": \"Develop a landscape view for your OnlineShop application.\",\r\n    \"references\": \"https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-3\",\r\n    \"done\": false\r\n\t},\r\n\t{\r\n    \"title\": \"Android - Homework 03\",\r\n    \"description\": \"Develop yet another thing to your online shop application.\",\r\n    \"references\": \"https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-4\",\r\n    \"done\": false\r\n\t}\r\n]"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "task",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/task/5e64f34e5893be012941b16f",
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \t\"title\": \"Android - Homework 01 - Put\",\n\t\"description\": \"Develop an OnlineShop application.\",\n    \"references\": \"https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-2\",\n    \"done\": true\n}"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "tasks",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks/",
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \t\"title\": \"Android - Homework 01 - Patched\",\n\t\"description\": \"Develop an OnlineShop application.\",\n    \"references\": \"https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-2\",\n    \"done\": true\n}"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "task",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks/5e64f34e5893be012941b16f",
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \t\"title\": \"Android - Homework 01 - Patch\"\n}"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "tasks",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks/5e64f34e5893be012941b16f",
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n \t\"title\": \"Android - Homework 01 - Patch\"\n}"
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "tasks",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks",
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "description": ""
+      },
+      "response": []
+    },
+    {
+      "name": "task",
+      "request": {
+        "url": "http://127.0.0.1:5000/api/v1/tasks",
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": ""
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "description": ""
+      },
+      "response": []
+    }
+  ]
+}
