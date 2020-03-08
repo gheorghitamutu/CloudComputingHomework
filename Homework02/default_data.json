@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Android - Homework 01",
+    "description": "Develop an OnlineShop application.",
+    "references": "https://sites.google.com/site/fiiandroidprogramming/laboratories/lab-2",
+    "done": true
+  },
+  {
+    "title": "Cloud Computing - Homework 01",
+    "description": "Create an application that provides results from at least three different webservices.",
+    "references": "https://profs.info.uaic.ro/~gcalancea/Week1.pdf",
+    "done": true
+  },
+  {
+    "title": "Computer Graphics - Homework 02",
+    "description": "Use the OpenGL library to draw flat curves.",
+    "references": "https://profs.info.uaic.ro/~ghirvu/gpc/tema2",
+    "done": true
+  }
+]
