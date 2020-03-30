@@ -1,7 +1,7 @@
 # https://www.virustotal.com
 # https://testmail.app
 # https://app.scrapinghub.com
-# https://logdna.com | https://github.com/logdna/python
+# https://cloud.google.com/logging/docs/reference/libraries#client-libraries-install-python
 # https://httpstatuses.com | status codes explained
 # https://github.com/pallets/flask/issues/2998 | logging behaviour explained
 
@@ -10,7 +10,7 @@ import logging
 import os
 import time
 
-import logdna
+import cloud_logger
 import mail_sender as ms
 import url_shortener as us
 import vt_report as vtr
@@ -43,8 +43,8 @@ class App(Flask):
         self.metrics = {
             'VT': 0,
             'VT_total_time': 0,
-            'logDNA': 0,
-            'logDNA_total_time': 0,
+            'cloud_logger': 0,
+            'cloud_logger_total_time': 0,
             'AWS': 0,
             'AWS_total_time': 0,
             'shortener': 0,
@@ -53,16 +53,14 @@ class App(Flask):
             'mail_total_time': 0
         }
 
-        try:
-            # logging - DNA
-            self.log_api = logdna.LogAPI(self.logger, self.metrics)
-        except Exception as e:
-            print(e)
+        # logging - google cloud
+        self.cloud_logger = cloud_logger.LogAPI(self.logger, self.metrics)
 
         #  bind routes callbacks
         self.add_url_rule('/', view_func=self.index, methods=['GET', 'POST'])
         self.add_url_rule('/shutdown', view_func=self.shutdown, methods=['GET', 'POST'])
         self.add_url_rule('/metrics', view_func=self.metrics_route, methods=['GET'])
+        self.add_url_rule('/logs', view_func=self.logs_route, methods=['GET'])
 
         # bind request events decorators
         self.before_request(self.log_before_request)
@@ -193,6 +191,9 @@ class App(Flask):
 
     def metrics_route(self):
         return self.metrics
+
+    def logs_route(self):
+        return self.cloud_logger.get_logs()
 
 
 app = App(__name__)  # fixing gunicorn app finder
