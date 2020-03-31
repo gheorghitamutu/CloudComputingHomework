@@ -10,8 +10,8 @@ import logging
 import os
 import time
 
+import cloud_gmail as ms
 import cloud_logger
-import mail_sender as ms
 import url_shortener as us
 import vt_report as vtr
 from flask import Flask, request, render_template, jsonify
@@ -72,8 +72,9 @@ class App(Flask):
             # self.vt_report.hash_report('13bc6e477d248677a8f435bef7965fb6')
 
             # mail sender
-            self.mail_sender = ms.GmailSender(self.logger)
-            # self.mail_sender.send_email("This is a test email!")
+            self.mail_sender = ms.MailSender()
+            # email = self.mail_sender.create_message('me', 'gheorghitamutu@gmail.com', 'Test mail!', 'Test mail!')
+            # message = self.mail_sender.send_message(email)
 
             # AWS3 Storage
             self.storage = AWS3Storage(self.logger)
@@ -132,9 +133,14 @@ class App(Flask):
                                         self.metrics['mail'] += 1
                                         start = time.time()
 
-                                        if self.mail_sender.send_email('Download link: {}'.format(
-                                                upload_url_shortened)) is True:
+                                        email = self.mail_sender.create_message(
+                                            'me',
+                                            'gheorghitamutu@gmail.com',
+                                            'Here is your download link!',
+                                            'Download link: {}'.format(upload_url_shortened))
+                                        message = self.mail_sender.send_message(email)
 
+                                        if message is not False:
                                             data['success'] = True
                                             data['message'] = 'Download link sent on email'
                                         else:
