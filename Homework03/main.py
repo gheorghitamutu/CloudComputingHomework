@@ -8,6 +8,7 @@
 import hashlib
 import logging
 import os
+import re
 import time
 
 import cloud_gmail as ms
@@ -15,7 +16,6 @@ import cloud_logger
 import url_shortener as us
 import vt_report as vtr
 from flask import Flask, request, render_template, jsonify
-from werkzeug.utils import secure_filename
 
 
 class App(Flask):
@@ -28,7 +28,7 @@ class App(Flask):
                          template_folder=os.path.join(os.getcwd(), 'web', 'templates', 'public'))
 
         self.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'web', 'uploads')
-        self.config['MAX_CONTENT_LENGTH'] = 0.2 * 1024 * 1024  # 0.2 MB  -> raises RequestEntityTooLarge exception
+        self.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB  -> raises RequestEntityTooLarge exception
 
         self.logger.setLevel(logging.DEBUG)
         App.app_logger = self.logger  # used from static decorators
@@ -72,12 +72,12 @@ class App(Flask):
             # self.vt_report.hash_report('13bc6e477d248677a8f435bef7965fb6')
 
             # mail sender
-            self.mail_sender = ms.MailSender()
+            self.mail_sender = ms.MailSender(self.logger)
             # email = self.mail_sender.create_message('me', 'gheorghitamutu@gmail.com', 'Test mail!', 'Test mail!')
             # message = self.mail_sender.send_message(email)
 
             # AWS3 Storage
-            self.storage = AWS3Storage(self.logger)
+            # self.storage = AWS3Storage(self.logger)
             # self.storage.upload_to_aws(r'D:\01\test', 'test')
 
             # URL shortener
@@ -94,74 +94,93 @@ class App(Flask):
                 {
                     'success': False,
                     'supported': False,
-                    'message': 'Default message.'
+                    'message': 'Failed uploading the file'
                 }
+
+            email = request.form['email']
+            if self.is_email_address_valid(email) is not True:
+                data['error'] = 'Invalid email address!'
+                return jsonify(data)
 
             file = request.files['upload_file']
 
             # if the user does not select a file, browser also submits an empty part without filename
             if file.filename == '':
                 data['message'] = 'No selected file!'
-            elif file and self.allowed_file(file.filename):
-                buffer = file.read()  # use this buffer for AWS upload as well
-                md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
+                return jsonify(data)
 
-                try:
-                    self.metrics['VT'] += 1
-                    start = time.time()
-                    vt_report = self.vt_report.hash_report(md5)
-                    self.metrics['VT_total_time'] += (time.time() - start)
-
-                    if vt_report['VT_call_succeeded'] is False:
-                        data['message'] = 'Failed querying VT!'
-                    else:
-                        data['supported'] = True
-
-                        if vt_report['VT_found'] is True:
-                            min_det_ratio = 10
-                            if vt_report['detpecentageint'] < min_det_ratio:
-                                self.metrics['AWS'] += 1
-                                start = time.time()
-                                upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
-                                self.metrics['AWS_total_time'] += (time.time() - start)
-                                if upload_url is not None:
-                                    self.metrics['shortener'] += 1
-                                    start = time.time()
-                                    upload_url_shortened = self.url_shortener.shorten_url(upload_url)
-                                    self.metrics['shortener_total_time'] += (time.time() - start)
-                                    if upload_url_shortened is not None:
-                                        self.metrics['mail'] += 1
-                                        start = time.time()
-
-                                        email = self.mail_sender.create_message(
-                                            'me',
-                                            'gheorghitamutu@gmail.com',
-                                            'Here is your download link!',
-                                            'Download link: {}'.format(upload_url_shortened))
-                                        message = self.mail_sender.send_message(email)
-
-                                        if message is not False:
-                                            data['success'] = True
-                                            data['message'] = 'Download link sent on email'
-                                        else:
-                                            data['message'] = 'Failed shortening the upload URL!'
-
-                                        self.metrics['mail_total_time'] += (time.time() - start)
-                                    else:
-                                        pass
-                                else:
-                                    data['message'] = 'Failed uploading to AWS!'
-                            else:
-                                data['message'] = 'Det percentage higher than {}: [{}%]'.format(
-                                    min_det_ratio,
-                                    int(vt_report['detpecentageint']))
-                        else:
-                            data['message'] = 'Unable to find any info on VT!'
-
-                except Exception as e:
-                    self.logger.error(e)
-            else:
+            if not file or not self.allowed_file(file.filename):
                 data['message'] = 'File type not allowed!'
+                return jsonify(data)
+
+            buffer = file.read()  # use this buffer for AWS upload as well
+            md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
+            try:
+                self.metrics['VT'] += 1
+                start = time.time()
+
+                vt_report = self.vt_report.hash_report(md5, buffer)
+
+                self.metrics['VT_total_time'] += (time.time() - start)
+
+                if vt_report['VT_call_succeeded'] is False:
+                    data['message'] = 'Failed querying VT!'
+                    return jsonify(data)
+
+                data['supported'] = True
+
+                if vt_report['VT_found'] is False:
+                    data['message'] = 'Unable to find any info on VT!'
+                    return jsonify(data)
+
+                min_det_ratio = 10
+
+                if vt_report['detpecentageint'] > min_det_ratio:
+                    data['message'] = 'Det percentage higher than {}: [{}%]'.format(
+                        min_det_ratio, int(vt_report['detpecentageint']))
+                    return jsonify(data)
+
+                self.metrics['AWS'] += 1
+                start = time.time()
+
+                # upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
+                upload_url = 'http://dummy.deleteme.com/TODO'
+
+                self.metrics['AWS_total_time'] += (time.time() - start)
+
+                if upload_url is None:
+                    data['message'] = 'Failed uploading to AWS!'
+                    return jsonify(data)
+
+                self.metrics['shortener'] += 1
+                start = time.time()
+
+                upload_url_shortened = self.url_shortener.shorten_url(upload_url)
+
+                self.metrics['shortener_total_time'] += (time.time() - start)
+
+                if upload_url_shortened is None:
+                    data['message'] = 'Failed shortening the upload URL!'
+                    return jsonify(data)
+
+                self.metrics['mail'] += 1
+                start = time.time()
+
+                email_id = self.mail_sender.send_message(
+                    'me',
+                    email,
+                    'Here is your download link!',
+                    'Download link: {}'.format(upload_url_shortened))
+
+                self.metrics['mail_total_time'] += (time.time() - start)
+
+                if email_id is not False:
+                    data['success'] = True
+                    data['message'] = 'Download link sent on email'
+                else:
+                    data['message'] = 'Failed sending the email!'
+            except Exception as e:
+                self.logger.error(e)
 
             return jsonify(data)
         elif request.method == 'GET':
@@ -200,6 +219,12 @@ class App(Flask):
 
     def logs_route(self):
         return self.cloud_logger.get_logs()
+
+    @staticmethod
+    def is_email_address_valid(email):
+        if not re.match("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$", email):
+            return False
+        return True
 
 
 app = App(__name__)  # fixing gunicorn app finder

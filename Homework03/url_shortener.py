@@ -18,17 +18,14 @@ class URLShortener:
         if response.status_code == 200:
             self.logger.info(response.json())
             return response.json()['result_url']
-        else:
-            self.logger.error(response.json())
 
-            response = requests.post(self.api_02, json=data)
+        self.logger.error(response.json())
+        response = requests.post(self.api_02, json=data)
 
-            if response.status_code == 201:
-                self.logger.info(response.json())
+        if response.status_code == 201:
+            self.logger.info(response.json())
+            return 'https://rel.ink/'.format(response['hashid'])
 
-                return 'https://rel.ink/'.format(response['hashid'])
-
-            else:
-                self.logger.error(response.json())
+        self.logger.error(response.json())
 
         return None

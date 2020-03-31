@@ -23,11 +23,19 @@
 
         <div class="card">
             <div class="card-body">
+                <div>
+                    <input class="form-control alert-danger" id="upload-email" placeholder="Enter email" type="email">
+                    <small class="form-text text-muted" id="emailHelp">We'll never share your email with anyone
+                        else.</small>
+                </div>
+
+                <br>
 
                 <div class="input-group">
                     <div class="input-group-prepend">
                         <span class="input-group-text" id="inputGroupFileAddon01">Upload</span>
                     </div>
+
                     <div class="custom-file">
                         <input aria-describedby="inputGroupFileAddon01" class="custom-file-input"
                                data="{{ url_for('index') }}" id="inputGroupFile01" type="file">
