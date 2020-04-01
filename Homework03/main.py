@@ -25,7 +25,6 @@ from flask import Flask, request, render_template, jsonify
 
 class App(Flask):
     app_logger = None
-
     def __init__(self, import_name):
         super().__init__(import_name,
                          static_url_path='',
@@ -78,17 +77,17 @@ class App(Flask):
 
             # mail sender
             self.mail_sender = ms.MailSender(self.logger)
-            #email = self.mail_sender.create_message('me', '', 'Test mail!', 'Test mail!')
+            # email = self.mail_sender.create_message('me', '', 'Test mail!', 'Test mail!')
             # message = self.mail_sender.send_message(email)
 
             # AWS3 Storage
             # self.storage = AWS3Storage(self.logger)
             # self.storage.upload_to_aws(r'D:\01\test', 'test')
 
-            #Google Storage
+            # Google Storage
             self.storage = google_storage.GCloudStorage(self.logger)
 
-            #Google DataStore
+            # Google DataStore
             self.database = db.Datastore(self.logger)
 
             # URL shortener
@@ -108,13 +107,12 @@ class App(Flask):
                     'message': 'Failed uploading the file'
                 }
 
-            email = request.form['email']
+            email = str(request.form['email'])
             if self.is_email_address_valid(email) is not True:
                 data['error'] = 'Invalid email address!'
                 return jsonify(data)
 
             file = request.files['upload_file']
-
             # if the user does not select a file, browser also submits an empty part without filename
             if file.filename == '':
                 data['message'] = 'No selected file!'
@@ -153,10 +151,8 @@ class App(Flask):
 
                 self.metrics['AWS'] += 1
                 start = time.time()
-
                 # upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
-                upload_url = self.storage.upload_file(file, secure_filename(file.filename))
-
+                upload_url = self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename))
 
                 self.metrics['AWS_total_time'] += (time.time() - start)
 
@@ -168,14 +164,21 @@ class App(Flask):
                 start = time.time()
 
                 upload_url_shortened = self.url_shortener.shorten_url(upload_url)
-
+              
                 self.metrics['shortener_total_time'] += (time.time() - start)
 
                 if upload_url_shortened is None:
                     data['message'] = 'Failed shortening the upload URL!'
                     return jsonify(data)
-                self.database.insert_user_data({'email': email, 'uploaded_file_url': upload_url_shortened})
 
+                db_data = {
+                    'email': email,
+                    'uploaded_file_url': upload_url_shortened,
+                    'file_name': secure_filename(file.filename),
+                    'hash': md5
+                }
+
+                self.database.insert_user_data(db_data)
                 self.metrics['mail'] += 1
                 start = time.time()
 
@@ -213,6 +216,7 @@ class App(Flask):
 
     @staticmethod
     def allowed_file(filename):
+
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ['txt', 'json', 'pdf', 'zip', 'xml']
 
     def shutdown_server(self):

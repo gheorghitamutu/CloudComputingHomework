@@ -13,7 +13,9 @@ class Datastore:
 
             task.update({
                 'email': data['email'],
-                'uploaded_file_url': data['uploaded_file_url']
+                'uploaded_file_url': data['uploaded_file_url'],
+                'file_name': data['file_name'],
+                'hash': data['hash']
             })
 
             self.client.put(task)
