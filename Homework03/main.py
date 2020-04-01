@@ -93,7 +93,7 @@ class App(Flask):
 
             # URL shortener
             self.url_shortener = us.URLShortener(self.logger)
-            # self.url_shortener.shorten_url('https://www.google.com')
+
         except Exception as e:
             print(e)
 

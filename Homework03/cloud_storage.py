@@ -8,7 +8,6 @@ class GCloudStorage:
         # config
         module_path = os.path.dirname(__file__)
         config_abs_path = os.path.join(module_path, 'config')
-
         self.config = dict()
         with open(config_abs_path, 'r') as fp_config:
             self.config = json.load(fp_config)
