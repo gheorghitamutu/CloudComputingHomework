@@ -11,11 +11,16 @@ import os
 import re
 import time
 
+from werkzeug.utils import secure_filename
+
 import cloud_gmail as ms
 import cloud_logger
 import url_shortener as us
 import vt_report as vtr
+import cloud_storage as google_storage
+import cloud_datastore as db
 from flask import Flask, request, render_template, jsonify
+
 
 
 class App(Flask):
@@ -73,12 +78,18 @@ class App(Flask):
 
             # mail sender
             self.mail_sender = ms.MailSender(self.logger)
-            # email = self.mail_sender.create_message('me', 'gheorghitamutu@gmail.com', 'Test mail!', 'Test mail!')
+            #email = self.mail_sender.create_message('me', '', 'Test mail!', 'Test mail!')
             # message = self.mail_sender.send_message(email)
 
             # AWS3 Storage
             # self.storage = AWS3Storage(self.logger)
             # self.storage.upload_to_aws(r'D:\01\test', 'test')
+
+            #Google Storage
+            self.storage = google_storage.GCloudStorage(self.logger)
+
+            #Google DataStore
+            self.database = db.Datastore(self.logger)
 
             # URL shortener
             self.url_shortener = us.URLShortener(self.logger)
@@ -144,7 +155,8 @@ class App(Flask):
                 start = time.time()
 
                 # upload_url = self.storage.upload_to_aws(file, secure_filename(file.filename))
-                upload_url = 'http://dummy.deleteme.com/TODO'
+                upload_url = self.storage.upload_file(file, secure_filename(file.filename))
+
 
                 self.metrics['AWS_total_time'] += (time.time() - start)
 
@@ -162,6 +174,7 @@ class App(Flask):
                 if upload_url_shortened is None:
                     data['message'] = 'Failed shortening the upload URL!'
                     return jsonify(data)
+                self.database.insert_user_data({'email': email, 'uploaded_file_url': upload_url_shortened})
 
                 self.metrics['mail'] += 1
                 start = time.time()
