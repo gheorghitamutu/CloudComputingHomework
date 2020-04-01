@@ -1,5 +1,6 @@
 import json
 import os
+
 from google.cloud import storage
 
 
@@ -27,6 +28,6 @@ class GCloudStorage:
             return upload_url
         except Exception as e:
             print(e)
-            self.logger.error("Something went wrong")
+            self.logger.error("Something went wrong when uploading file")
 
         return None
