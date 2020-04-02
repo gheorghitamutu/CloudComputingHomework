@@ -27,7 +27,7 @@ class VTReport:
     def hash_report(self, md5, buffer=None):
         response = self.report(md5)
 
-        log_level = None
+        log_level = logging.DEBUG
         logger_info = \
             {
                 'md5': md5,  # replace this with the actual computed md5
