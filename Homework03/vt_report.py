@@ -1,6 +1,3 @@
-import json
-import logging
-import os
 import time
 from urllib.parse import urljoin
 
@@ -8,38 +5,29 @@ import requests
 
 
 class VTReport:
-    def __init__(self, logger):
+    def __init__(self, logger, cloud_config):
         self.logger = logger
-
-        # config
-        module_path = os.path.dirname(__file__)
-        config_abs_path = os.path.join(module_path, 'config')
-
-        self.api_config = dict()
-        with open(config_abs_path, 'r') as fp_config:
-            self.api_config = json.load(fp_config)
+        self.cloud_config = cloud_config
 
         self.api = 'https://www.virustotal.com/vtapi/v2/'
-        self.api_key = self.api_config['VT_API_Key']
+        self.api_key = self.cloud_config.config_json['VT_API_Key']
         self.file_report_url = urljoin(self.api, 'file/report')
         self.file_scan_url = urljoin(self.api, 'file/scan')
 
     def hash_report(self, md5, buffer=None):
         response = self.report(md5)
 
-        log_level = logging.DEBUG
         logger_info = \
             {
-                'md5': md5,  # replace this with the actual computed md5
+                'md5': md5,
                 'det_percentage': '{0:.2f}%'.format(0),
                 'VT_call_succeeded': False,
                 'VT_found': False,
-                'detpecentageint': 0
+                'detpercentageint': 0
             }
 
         if response.status_code != 200:
-            log_level = logging.ERROR
-            self.logger.log(log_level, str(logger_info))
+            self.logger.error(str(logger_info))
             return logger_info
 
         logger_info['VT_call_succeeded'] = True
@@ -48,55 +36,64 @@ class VTReport:
             logger_info['det_percentage'] = '{0:.2f}%'.format(
                 json_response['positives'] / json_response['total'] * 100)
             logger_info['VT_found'] = True
-            logger_info['detpecentageint'] = json_response['positives'] / json_response['total'] * 100
-            log_level = logging.INFO
+            logger_info['detpercentageint'] = json_response['positives'] / json_response['total'] * 100
 
-            self.logger.log(log_level, str(logger_info))
+            self.logger.info(str(logger_info))
             return logger_info
 
-        if buffer is not None:
-            response = self.scan(md5, buffer)
-            if response.status_code == 200:
-                json_response = response.json()
+        if buffer is None:
+            self.logger.info(str(logger_info))
+            return logger_info
 
-                if json_response['response_code'] == 1:  # all good
+        response = self.scan(md5, buffer)
+        if response.status_code != 200:
+            self.logger.error(str(logger_info))
+            return logger_info
 
-                    response = self.report(md5)
-                    json_response = response.json()
+        json_response = response.json()
 
-                    # TODO: add timeout?!
-                    while json_response['response_code'] == -2:
-                        time.sleep(30)
-                        response = self.report(md5)
-                        json_response = response.json()
+        if json_response['response_code'] != 1:  # all good
+            self.logger.info(str(logger_info))
+            return logger_info
 
-                    if json_response['response_code'] == 1:  # hash found on VT
-                        logger_info['det_percentage'] = '{0:.2f}%'.format(
-                            json_response['positives'] / json_response['total'] * 100)
-                        logger_info['VT_found'] = True
-                        logger_info['detpecentageint'] = json_response['positives'] / json_response['total'] * 100
-                        log_level = logging.INFO
+        response = self.report(md5)
+        json_response = response.json()
 
-                        self.logger.log(log_level, str(logger_info))
-                        return logger_info
+        # TODO: add timeout?!
+        while json_response['response_code'] == -2:
+            time.sleep(30)
+            response = self.report(md5)
+            json_response = response.json()
 
-        self.logger.log(log_level, str(logger_info))
+        if json_response['response_code'] != 1:  # hash found on VT
+            self.logger.info(str(logger_info))
+            return logger_info
+
+        logger_info['det_percentage'] = '{0:.2f}%'.format(
+            json_response['positives'] / json_response['total'] * 100)
+        logger_info['VT_found'] = True
+        logger_info['detpercentageint'] = json_response['positives'] / json_response['total'] * 100
+
+        self.logger.info(str(logger_info))
         return logger_info
 
     def report(self, md5):
-        params = \
-            {
-                'apikey': self.api_key,
-                'resource': md5
-            }
+        params = {
+            'apikey': self.api_key,
+            'resource': md5
+        }
 
         response = requests.get(self.file_report_url, params=params)
 
         return response
 
     def scan(self, md5, buffer):
-        files = {'file': (md5, buffer)}
-        params = {'apikey': self.api_key}
+        files = {
+            'file': (md5, buffer)
+        }
+        params = {
+            'apikey': self.api_key
+        }
         response = requests.post(self.file_scan_url, files=files, params=params)
 
         return response

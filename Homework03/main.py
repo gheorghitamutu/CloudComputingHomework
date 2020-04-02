@@ -1,25 +1,19 @@
-# https://www.virustotal.com
-# https://testmail.app
-# https://app.scrapinghub.com
-# https://cloud.google.com/logging/docs/reference/libraries#client-libraries-install-python
-# https://httpstatuses.com | status codes explained
-# https://github.com/pallets/flask/issues/2998 | logging behaviour explained
-
 import hashlib
 import logging
 import os
 import re
+import sys
 import time
 
-from flask import Flask, request, render_template, jsonify
-from werkzeug.utils import secure_filename
-
+import cloud_config
 import cloud_datastore as db
 import cloud_gmail as ms
 import cloud_logger
 import cloud_storage as google_storage
 import url_shortener as us
 import vt_report as vtr
+from flask import Flask, request, render_template, jsonify
+from werkzeug.utils import secure_filename
 
 
 class App(Flask):
@@ -32,16 +26,10 @@ class App(Flask):
                          template_folder=os.path.join(os.getcwd(), 'web', 'templates', 'public'))
 
         self.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'web', 'uploads')
-        self.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024  # 2 MB  -> raises RequestEntityTooLarge exception
+        self.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB  -> raises RequestEntityTooLarge exception
 
         self.logger.setLevel(logging.DEBUG)
-        App.app_logger = self.logger  # used from static decorators
-
-        formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-        # fileHandler = logging.FileHandler("{}.log".format(self.__class__.__name__))
-        # fileHandler.setFormatter(formatter)
-        # self.logger.addHandler(fileHandler)
-        # fileHandler.close()
+        App.app_logger = self.logger
 
         # metrics
         self.metrics = {
@@ -59,29 +47,31 @@ class App(Flask):
             'mail_total_time': 0
         }
 
-        # logging - google cloud
-        self.cloud_logger = cloud_logger.LogAPI(self.logger, self.metrics)
-
         #  bind routes callbacks
         self.add_url_rule('/', view_func=self.index, methods=['GET', 'POST'])
         self.add_url_rule('/shutdown', view_func=self.shutdown, methods=['GET', 'POST'])
         self.add_url_rule('/metrics', view_func=self.metrics_route, methods=['GET'])
         self.add_url_rule('/logs', view_func=self.logs_route, methods=['GET'])
 
-        # bind request events decorators
-        self.before_request(self.log_before_request)
-        self.after_request(self.log_after_request)
-
         try:
+            # get config and credentials from cloud
+            self.cloud_config = cloud_config.CloudConfig(self.logger)
+
+            # logging - google cloud
+            self.cloud_logger = cloud_logger.LogAPI(self.logger, self.metrics)
+
+            # bind request events decorators
+            self.before_request(self.log_before_request)
+            self.after_request(self.log_after_request)
+
             # Virus Total hash report
-            self.vt_report = vtr.VTReport(self.logger)
-            # self.vt_report.hash_report('13bc6e477d248677a8f435bef7965fb6')
+            self.vt_report = vtr.VTReport(self.logger, self.cloud_config)
 
             # mail sender
-            self.mail_sender = ms.MailSender(self.logger)
+            self.mail_sender = ms.MailSender(self.logger, self.cloud_config)
 
             # Google Storage
-            self.storage = google_storage.GCloudStorage(self.logger)
+            self.storage = google_storage.GCloudStorage(self.logger, self.cloud_config)
 
             # Google DataStore
             self.database = db.Datastore(self.logger)
@@ -90,19 +80,19 @@ class App(Flask):
             self.url_shortener = us.URLShortener(self.logger)
 
         except Exception as e:
-            print(e)
             self.logger.exception(e)
+            self.logger.debug('{} initialization finished with errors!'.format(self.__class__.__name__))
+            sys.exit(1)
 
         self.logger.debug('{} initialization finished!'.format(self.__class__.__name__))
 
     def index(self):
         if request.method == 'POST':
-            data = \
-                {
-                    'success': False,
-                    'supported': False,
-                    'message': 'Failed uploading the file'
-                }
+            data = {
+                'success': False,
+                'supported': False,
+                'message': 'Failed uploading the file'
+            }
 
             email = str(request.form['email'])
             if self.is_email_address_valid(email) is not True:
@@ -119,21 +109,24 @@ class App(Flask):
                 data['message'] = 'File type not allowed!'
                 return jsonify(data)
 
-            buffer = file.read()  # use this buffer for AWS upload as well
+            buffer = file.read()  # use this buffer for Cloud Storage upload as well
             md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
             try:
                 # check if file already exists for this email
                 self.metrics['datastore'] += 1
                 start = time.time()
-                existent_file = self.database.check_db_file_existence(email, secure_filename(file.filename))
+
+                # TODO: search if after hash, is more reliable
+                # Also, pretty sure it doesn't matter the user, it just needs to be there
+                upload_url_shortened = self.database.get_file_url(email, secure_filename(file.filename))
+
                 self.metrics['datastore_total_time'] += (time.time() - start)
 
-                if existent_file is None:
-                    data['message'] = "Database error"
+                if upload_url_shortened is None:
+                    data['message'] = "Database error!"
                     return jsonify(data)
-                if existent_file:
-                    upload_url_shortened = existent_file
-                else:
+
+                if upload_url_shortened is False:
                     # virus scan
                     self.metrics['VT'] += 1
                     start = time.time()
@@ -153,16 +146,18 @@ class App(Flask):
 
                     min_det_ratio = 10
 
-                    if vt_report['detpecentageint'] > min_det_ratio:
+                    if vt_report['detpercentageint'] > min_det_ratio:
                         data['message'] = 'Det percentage higher than {}: [{}%]'.format(
-                            min_det_ratio, int(vt_report['detpecentageint']))
+                            min_det_ratio, int(vt_report['detpercentageint']))
                         return jsonify(data)
 
                     # adding file to storage
                     self.metrics['GCloud_Storage'] += 1
                     start = time.time()
-                    upload_url = self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename),
-                                                          email)
+
+                    upload_url = \
+                        self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename), email)
+
                     if upload_url is None:
                         data['message'] = 'Failed uploading to GCloud_Storage!'
                         return jsonify(data)
@@ -192,15 +187,18 @@ class App(Flask):
                     }
 
                     if self.database.insert_user_data(db_data) is False:
-                        data['message'] = 'Database error'
+                        data['message'] = 'Database error!'
                         return jsonify(data)
 
                     self.metrics['datastore_total_time'] += (time.time() - start)
 
+                data['supported'] = True
+
                 # send email
                 self.metrics['mail'] += 1
                 start = time.time()
-                email_id = self.mail_sender.send_message(
+
+                email_response = self.mail_sender.send_message(
                     'me',
                     email,
                     'Here is your download link!',
@@ -208,19 +206,17 @@ class App(Flask):
 
                 self.metrics['mail_total_time'] += (time.time() - start)
 
-                upload_status = ""
-                if existent_file:
-                    upload_status += "File already exists."
-                if email_id is not False:
-                    data['success'] = True
+                if email_response is False:
+                    data['message'] = 'Failed sending the email!'
+                    return jsonify(data)
 
-                    data['message'] = '{} Download link sent on email'.format(upload_status)
-                else:
-                    data['message'] = '{} Failed sending the email!'.format(upload_status)
+                data['success'] = True
+                data['message'] = 'Download link sent on email.'
             except Exception as e:
                 self.logger.exception(e)
 
             return jsonify(data)
+
         elif request.method == 'GET':
             return render_template('upload.html')
 
@@ -238,8 +234,11 @@ class App(Flask):
 
     @staticmethod
     def allowed_file(filename):
+        if type(filename) != str:
+            return False
 
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ['txt', 'json', 'pdf', 'zip', 'xml']
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in \
+               ['txt', 'json', 'pdf', 'zip', 'xml', 'png', 'bin', 'jpg', 'zip']
 
     def shutdown_server(self):
         func = request.environ.get('werkzeug.server.shutdown')

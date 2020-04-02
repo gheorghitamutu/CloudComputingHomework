@@ -9,27 +9,16 @@ from email.mime.text import MIMEText
 
 from apiclient.discovery import build
 from httplib2 import Http
-from oauth2client import file, client, tools
 
 
 class MailSender:
-    def __init__(self, logger):
+    def __init__(self, logger, cloud_config):
         self.logger = logger
+        self.cloud_config = cloud_config
         self.user_id = 'me'
         self.scope = 'https://www.googleapis.com/auth/gmail.compose'
-        self.storage = file.Storage('credentials.json')
 
-        credentials = self.storage.get()
-        if not credentials or credentials.invalid:
-            flow = client.flow_from_clientsecrets(
-                'client_secret_184366389851-u8b66fhhagsvhrdk4p4atm9023scrra0.apps.googleusercontent.com.json',
-                self.scope)
-
-            args = tools.argparser.parse_args()
-            args.auth_host_port = [9000, 9090]  # work around because you're on a flask server with 8080 default!!!
-            credentials = tools.run_flow(flow, self.storage, args)
-
-        self.service = build('gmail', 'v1', http=credentials.authorize(Http()))
+        self.service = build('gmail', 'v1', http=self.cloud_config.mail_credentials.authorize(Http()))
 
     def send_message(self, sender, to, subject, message_text):
         message = MailSender.create_message(sender, to, subject, message_text)
@@ -90,5 +79,4 @@ class MailSender:
         msg.add_header('Content-Disposition', 'attachment', filename=filename)
         message.attach(msg)
 
-        return {'raw': base64.urlsafe_b64encode(message.as_string())}
-
+        return {'raw': urlsafe_b64encode(message.as_string())}

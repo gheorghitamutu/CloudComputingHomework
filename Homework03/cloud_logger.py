@@ -2,7 +2,6 @@ import logging
 import time
 
 import threadpool as tp
-# Imports the Google Cloud client library
 from google.cloud import logging as google_logging
 from google.cloud.logging import DESCENDING
 
@@ -17,28 +16,21 @@ class LogAPI(logging.Handler):
         self.logger = logger
         self.logger.addHandler(self)
 
+        self.threadpool = tp.ThreadPool(4)
         self.metrics = metrics
-
-        # Instantiates a client
         self.logging_client = google_logging.Client()
-
-        # Selects the log to write to
         self.cloud_logger = self.logging_client.logger(self.__class__.__name__)
 
-        self.threadpool = tp.ThreadPool(4)
-
     def emit(self, record):
-        self.metrics['cloud_logger'] += 1
         self.threadpool.add_task(self.helper_thread, record)
 
     def helper_thread(self, record):
+        self.metrics['cloud_logger'] += 1
         start = time.time()
 
         self.cloud_logger.log_text(record)
 
         self.metrics['cloud_logger_total_time'] += (time.time() - start)
-
-        return response  # TODO: can you really check this?
 
     def __del__(self):  # don't bail out before writing/calling API logs
         self.threadpool.wait_completion()

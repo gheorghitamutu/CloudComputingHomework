@@ -26,7 +26,7 @@ class Datastore:
             self.logger.exception(e)
             return None
 
-    def check_db_file_existence(self, email, file_name):
+    def get_file_url(self, email, file_name):
         self.logger.debug('Checking if user file already exists')
         try:
             query = self.client.query(kind="users_info")
@@ -36,7 +36,9 @@ class Datastore:
 
             if len(entities) == 0:
                 return False
+
             self.logger.debug('Checking for user file existence was successful')
+
             return entities[0]["uploaded_file_url"]
         except Exception as e:
             self.logger.exception(e)
