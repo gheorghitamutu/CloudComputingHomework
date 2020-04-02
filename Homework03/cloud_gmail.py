@@ -7,7 +7,6 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from apiclient import errors
 from apiclient.discovery import build
 from httplib2 import Http
 from oauth2client import file, client, tools
@@ -40,8 +39,8 @@ class MailSender:
             response = (self.service.users().messages().send(userId=self.user_id, body=message).execute())
             self.logger.debug('Message sent: [{}]'.format(response))
             return response
-        except errors.HttpError as error:
-            self.logger.error('Error sending the email: [{}]'.format(str(error)))
+        except Exception as e:
+            self.logger.exception(e)
             return None
 
     @staticmethod

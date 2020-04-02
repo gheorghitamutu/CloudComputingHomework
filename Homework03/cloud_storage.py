@@ -30,7 +30,7 @@ class GCloudStorage:
             self.logger.debug('File [{}] was uploaded successfully to bucke [{}]'.format(key, self.bucket_name))
             return upload_url
         except Exception as e:
-            self.logger.error("Something went wrong when uploading file: {}".format(e))
+            self.logger.exception(e)
             return None
 
 

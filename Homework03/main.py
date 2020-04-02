@@ -11,15 +11,14 @@ import os
 import re
 import time
 
-from flask import Flask, request, render_template, jsonify
-from werkzeug.utils import secure_filename
-
 import cloud_datastore as db
 import cloud_gmail as ms
 import cloud_logger
 import cloud_storage as google_storage
 import url_shortener as us
 import vt_report as vtr
+from flask import Flask, request, render_template, jsonify
+from werkzeug.utils import secure_filename
 
 
 class App(Flask):
@@ -91,6 +90,7 @@ class App(Flask):
 
         except Exception as e:
             print(e)
+            self.logger.exception(e)
 
         self.logger.debug('{} initialization finished!'.format(self.__class__.__name__))
 
@@ -145,7 +145,7 @@ class App(Flask):
                         min_det_ratio, int(vt_report['detpecentageint']))
                     return jsonify(data)
 
-                #adding file to storage
+                # adding file to storage
                 self.metrics['GCloud_Storage'] += 1
                 start = time.time()
                 # check if file already exists for this email
@@ -165,7 +165,7 @@ class App(Flask):
                     data['message'] = 'Failed uploading to GCloud_Storage!'
                     return jsonify(data)
 
-                #make url shorter
+                # make url shorter
                 self.metrics['shortener'] += 1
                 start = time.time()
 
@@ -177,7 +177,7 @@ class App(Flask):
                     data['message'] = 'Failed shortening the upload URL!'
                     return jsonify(data)
 
-                #add user data for this file in db
+                # add user data for this file in db
                 self.metrics['datastore'] += 1
                 start = time.time()
                 db_data = {
@@ -190,10 +190,10 @@ class App(Flask):
                 if self.database.insert_user_data(db_data) is False:
                     data['message'] = 'Database error'
                     return jsonify(data)
+
                 self.metrics['datastore_total_time'] += (time.time() - start)
 
-
-                #send email
+                # send email
                 self.metrics['mail'] += 1
                 start = time.time()
                 email_id = self.mail_sender.send_message(
@@ -210,7 +210,7 @@ class App(Flask):
                 else:
                     data['message'] = 'Failed sending the email!'
             except Exception as e:
-                self.logger.error(e)
+                self.logger.exception(e)
 
             return jsonify(data)
         elif request.method == 'GET':

@@ -11,6 +11,9 @@ class LogAPI(logging.Handler):
     def __init__(self, logger, metrics):
         super().__init__()
 
+        formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        self.setFormatter(formatter)
+
         self.logger = logger
         self.logger.addHandler(self)
 

@@ -23,7 +23,7 @@ class Datastore:
             self.logger.debug("Datastore addition was successful")
             return True
         except Exception as e:
-            self.logger.error('Database addition was unsuccessful: [{}]'.format(e))
+            self.logger.exception(e)
             return None
 
     def check_db_file_existence(self, email, file_name):
@@ -38,5 +38,5 @@ class Datastore:
             return True
 
         except Exception as e:
-            self.logger.error('Database query was unsuccessful: [{}]'.format(e))
+            self.logger.exception(e)
             return None
