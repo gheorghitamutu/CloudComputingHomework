@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let xhr = new XMLHttpRequest();
     let uploaded_file_details = document.getElementById('uploaded_file_details');
     let uploaded_file_current_innerHTML = '';
-    let at_least_one_file_uploaded = false;
     let delete_default_message = true;
     let file_picked_area = document.getElementById('inputGroupFile01');
     file_picked_area.disabled = true;
@@ -49,10 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let url = this.getAttribute('data');
             xhr.open("POST", url, true);
             xhr.send(data);
-
-            if (at_least_one_file_uploaded == true) {
-                uploaded_file_current_innerHTML += '<br>';
-            }
 
             uploaded_file_current_innerHTML += '<div class="card text-center"><div class="card-body"><div class="row">';
             uploaded_file_current_innerHTML += '<div class="col alert alert-dark" role="alert" id="myalert">' + file_to_upload.name.trim() + '</div>';
@@ -100,10 +95,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             uploaded_file_current_innerHTML += '</div></div></div>';
 
-            uploaded_file_details.innerHTML = uploaded_file_current_innerHTML + uploaded_file_details.innerHTML;
-            uploaded_file_current_innerHTML = '';
+            if (uploaded_file_details.innerHTML === "") {
+                uploaded_file_details.innerHTML = uploaded_file_current_innerHTML;
+            }
+            else {
+                uploaded_file_details.innerHTML = uploaded_file_current_innerHTML + '<br/>' + uploaded_file_details.innerHTML;
+            }
 
-            at_least_one_file_uploaded = true;
+            uploaded_file_current_innerHTML = '';
         }
     };
 
