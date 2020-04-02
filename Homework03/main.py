@@ -11,14 +11,15 @@ import os
 import re
 import time
 
+from flask import Flask, request, render_template, jsonify
+from werkzeug.utils import secure_filename
+
 import cloud_datastore as db
 import cloud_gmail as ms
 import cloud_logger
 import cloud_storage as google_storage
 import url_shortener as us
 import vt_report as vtr
-from flask import Flask, request, render_template, jsonify
-from werkzeug.utils import secure_filename
 
 
 class App(Flask):
@@ -50,8 +51,8 @@ class App(Flask):
             'cloud_logger_total_time': 0,
             'GCloud_Storage': 0,
             'GCloud_Storage_total_time': 0,
-            'datastore' : 0,
-            'datastore_total_time' : 0,
+            'datastore': 0,
+            'datastore_total_time': 0,
             'shortener': 0,
             'shortener_total_time': 0,
             'mail': 0,
@@ -121,7 +122,7 @@ class App(Flask):
             buffer = file.read()  # use this buffer for AWS upload as well
             md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
             try:
-                #virus scan
+                # virus scan
                 self.metrics['VT'] += 1
                 start = time.time()
                 vt_report = self.vt_report.hash_report(md5, buffer)
@@ -149,49 +150,49 @@ class App(Flask):
                 self.metrics['GCloud_Storage'] += 1
                 start = time.time()
                 # check if file already exists for this email
-                operation = self.database.check_db_file_existence(email, file.filename)
-                if operation is True:
-                    data['message'] = "Your file already exists"
-                    return jsonify(data)
-                if operation is None:
+                existent_file = self.database.check_db_file_existence(email, file.filename)
+
+                if existent_file is None:
                     data['message'] = "Database error"
                     return jsonify(data)
+                if existent_file:
+                    upload_url_shortened = existent_file
+                else:
+                    upload_url = self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename),
+                                                          email)
+                    if upload_url is None:
+                        data['message'] = 'Failed uploading to GCloud_Storage!'
+                        return jsonify(data)
 
-                upload_url = self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename), email)
+                    self.metrics['GCloud_Storage_total_time'] += (time.time() - start)
 
-                self.metrics['GCloud_Storage_total_time'] += (time.time() - start)
+                    # make url shorter
+                    self.metrics['shortener'] += 1
+                    start = time.time()
 
-                if upload_url is None:
-                    data['message'] = 'Failed uploading to GCloud_Storage!'
-                    return jsonify(data)
+                    upload_url_shortened = self.url_shortener.shorten_url(upload_url)
 
-                # make url shorter
-                self.metrics['shortener'] += 1
-                start = time.time()
+                    self.metrics['shortener_total_time'] += (time.time() - start)
 
-                upload_url_shortened = self.url_shortener.shorten_url(upload_url)
+                    if upload_url_shortened is None:
+                        data['message'] = 'Failed shortening the upload URL!'
+                        return jsonify(data)
 
-                self.metrics['shortener_total_time'] += (time.time() - start)
+                    # add user data for this file in db
+                    self.metrics['datastore'] += 1
+                    start = time.time()
+                    db_data = {
+                        'email': email,
+                        'uploaded_file_url': upload_url_shortened,
+                        'file_name': secure_filename(file.filename),
+                        'hash': md5
+                    }
 
-                if upload_url_shortened is None:
-                    data['message'] = 'Failed shortening the upload URL!'
-                    return jsonify(data)
+                    if self.database.insert_user_data(db_data) is False:
+                        data['message'] = 'Database error'
+                        return jsonify(data)
 
-                # add user data for this file in db
-                self.metrics['datastore'] += 1
-                start = time.time()
-                db_data = {
-                    'email': email,
-                    'uploaded_file_url': upload_url_shortened,
-                    'file_name': secure_filename(file.filename),
-                    'hash': md5
-                }
-
-                if self.database.insert_user_data(db_data) is False:
-                    data['message'] = 'Database error'
-                    return jsonify(data)
-
-                self.metrics['datastore_total_time'] += (time.time() - start)
+                    self.metrics['datastore_total_time'] += (time.time() - start)
 
                 # send email
                 self.metrics['mail'] += 1
@@ -204,11 +205,15 @@ class App(Flask):
 
                 self.metrics['mail_total_time'] += (time.time() - start)
 
+                upload_status = ""
+                if existent_file:
+                    upload_status += "File already exists."
                 if email_id is not False:
                     data['success'] = True
-                    data['message'] = 'Download link sent on email'
+
+                    data['message'] = '{} Download link sent on email'.format(upload_status)
                 else:
-                    data['message'] = 'Failed sending the email!'
+                    data['message'] = '{} Failed sending the email!'.format(upload_status)
             except Exception as e:
                 self.logger.exception(e)
 

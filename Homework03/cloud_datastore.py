@@ -32,10 +32,12 @@ class Datastore:
             query = self.client.query(kind="users_info")
             query.add_filter("email", '=', email)
             query.add_filter("file_name", '=', file_name)
-            if len([entity for entity in query.fetch()]) == 0:
+            entities = [entity for entity in query.fetch()]
+
+            if len(entities) == 0:
                 return False
             self.logger.debug('Checking for user file existence was successful')
-            return True
+            return entities[0]["uploaded_file_url"]
 
         except Exception as e:
             self.logger.exception(e)
