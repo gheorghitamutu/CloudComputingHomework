@@ -122,35 +122,11 @@ class App(Flask):
             buffer = file.read()  # use this buffer for AWS upload as well
             md5 = hashlib.md5(buffer).hexdigest()  # low limit so read everything at once
             try:
-                # virus scan
-                self.metrics['VT'] += 1
-                start = time.time()
-                vt_report = self.vt_report.hash_report(md5, buffer)
-
-                self.metrics['VT_total_time'] += (time.time() - start)
-
-                if vt_report['VT_call_succeeded'] is False:
-                    data['message'] = 'Failed querying VT!'
-                    return jsonify(data)
-
-                data['supported'] = True
-
-                if vt_report['VT_found'] is False:
-                    data['message'] = 'Unable to find any info on VT!'
-                    return jsonify(data)
-
-                min_det_ratio = 10
-
-                if vt_report['detpecentageint'] > min_det_ratio:
-                    data['message'] = 'Det percentage higher than {}: [{}%]'.format(
-                        min_det_ratio, int(vt_report['detpecentageint']))
-                    return jsonify(data)
-
-                # adding file to storage
-                self.metrics['GCloud_Storage'] += 1
-                start = time.time()
                 # check if file already exists for this email
+                self.metrics['datastore'] += 1
+                start = time.time()
                 existent_file = self.database.check_db_file_existence(email, file.filename)
+                self.metrics['datastore_total_time'] += (time.time() - start)
 
                 if existent_file is None:
                     data['message'] = "Database error"
@@ -158,6 +134,33 @@ class App(Flask):
                 if existent_file:
                     upload_url_shortened = existent_file
                 else:
+                    # virus scan
+                    self.metrics['VT'] += 1
+                    start = time.time()
+                    vt_report = self.vt_report.hash_report(md5, buffer)
+
+                    self.metrics['VT_total_time'] += (time.time() - start)
+
+                    if vt_report['VT_call_succeeded'] is False:
+                        data['message'] = 'Failed querying VT!'
+                        return jsonify(data)
+
+                    data['supported'] = True
+
+                    if vt_report['VT_found'] is False:
+                        data['message'] = 'Unable to find any info on VT!'
+                        return jsonify(data)
+
+                    min_det_ratio = 10
+
+                    if vt_report['detpecentageint'] > min_det_ratio:
+                        data['message'] = 'Det percentage higher than {}: [{}%]'.format(
+                            min_det_ratio, int(vt_report['detpecentageint']))
+                        return jsonify(data)
+
+                    # adding file to storage
+                    self.metrics['GCloud_Storage'] += 1
+                    start = time.time()
                     upload_url = self.storage.upload_file(buffer, file.content_type, secure_filename(file.filename),
                                                           email)
                     if upload_url is None:
