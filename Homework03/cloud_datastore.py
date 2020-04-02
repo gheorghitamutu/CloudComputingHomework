@@ -38,7 +38,6 @@ class Datastore:
                 return False
             self.logger.debug('Checking for user file existence was successful')
             return entities[0]["uploaded_file_url"]
-
         except Exception as e:
             self.logger.exception(e)
             return None
