@@ -125,7 +125,7 @@ class App(Flask):
                 # check if file already exists for this email
                 self.metrics['datastore'] += 1
                 start = time.time()
-                existent_file = self.database.check_db_file_existence(email, file.filename)
+                existent_file = self.database.check_db_file_existence(email, secure_filename(file.filename))
                 self.metrics['datastore_total_time'] += (time.time() - start)
 
                 if existent_file is None:
